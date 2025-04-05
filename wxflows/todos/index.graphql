@@ -1,0 +1,11 @@
+type TodosEntry {
+  completed: Boolean
+  id: Int
+  title: String
+  userId: Int
+}
+
+type Query {
+  todos: [TodosEntry]
+    @rest(endpoint: "https://jsonplaceholder.typicode.com/todos/")
+}
