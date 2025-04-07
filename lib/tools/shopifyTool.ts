@@ -1,10 +1,33 @@
+type ShopifyOrder = {
+  total_price: string;
+  line_items: Array<{
+    product_id: string;
+    title: string;
+    quantity: number;
+  }>;
+};
+
+interface ShopifyOrdersResponse {
+  orders: ShopifyOrder[];
+}
+
+interface ShopifyCountResponse {
+  count: number;
+}
+
+type ShopifyAction =
+  | "customerCount"
+  | "orderCount"
+  | "salesLastNDays"
+  | "avgOrderValue"
+  | "topSellingProducts";
+
 export const shopifyTool = async ({
   action,
-  days = 30, // Default to 30 if not specified
+  days = 30,
 }: {
-  action: "customerCount" | "orderCount" | "salesLastNDays" | "avgOrderValue" | "topSellingProducts";
+  action: ShopifyAction;
   days?: number;
-  filter?: string;
 }): Promise<string> => {
   const baseUrl = process.env.SHOPIFY_STORE!;
   const headers = {
@@ -24,31 +47,31 @@ export const shopifyTool = async ({
     case "customerCount": {
       const url = `${baseUrl}/admin/api/2023-07/customers/count.json`;
       const response = await fetch(url, { headers });
-      const data = await response.json();
+      const data = (await response.json()) as ShopifyCountResponse;
       return `Customer count: ${data.count}`;
     }
 
     case "orderCount": {
       const url = `${baseUrl}/admin/api/2023-07/orders/count.json?created_at_min=${from}&created_at_max=${to}&status=any`;
       const response = await fetch(url, { headers });
-      const data = await response.json();
+      const data = (await response.json()) as ShopifyCountResponse;
       return `Order count in last ${days} days: ${data.count}`;
     }
 
     case "salesLastNDays": {
       const response = await fetch(orderFetchUrl, { headers });
-      const data = await response.json();
-      const totalSales = data.orders.reduce((sum: number, order: any) => {
-        return sum + parseFloat(order.total_price || 0);
+      const data = (await response.json()) as ShopifyOrdersResponse;
+      const totalSales = data.orders.reduce((sum, order) => {
+        return sum + parseFloat(order.total_price || "0");
       }, 0);
       return `Sales in the last ${days} days: ₹${totalSales.toFixed(2)}`;
     }
 
     case "avgOrderValue": {
       const response = await fetch(orderFetchUrl, { headers });
-      const data = await response.json();
-      const totalSales = data.orders.reduce((sum: number, order: any) => {
-        return sum + parseFloat(order.total_price || 0);
+      const data = (await response.json()) as ShopifyOrdersResponse;
+      const totalSales = data.orders.reduce((sum, order) => {
+        return sum + parseFloat(order.total_price || "0");
       }, 0);
       const average = totalSales / data.orders.length || 0;
       return `Average order value (last ${days} days): ₹${average.toFixed(2)}`;
@@ -56,18 +79,17 @@ export const shopifyTool = async ({
 
     case "topSellingProducts": {
       const response = await fetch(orderFetchUrl, { headers });
-      const data = await response.json();
+      const data = (await response.json()) as ShopifyOrdersResponse;
 
       const productMap = new Map<string, { title: string; quantity: number }>();
 
-      data.orders.forEach((order: any) => {
-        order.line_items.forEach((item: any) => {
-          const key = item.product_id;
-          const existing = productMap.get(key);
+      data.orders.forEach((order) => {
+        order.line_items.forEach((item) => {
+          const existing = productMap.get(item.product_id);
           if (existing) {
             existing.quantity += item.quantity;
           } else {
-            productMap.set(key, {
+            productMap.set(item.product_id, {
               title: item.title,
               quantity: item.quantity,
             });
@@ -75,10 +97,10 @@ export const shopifyTool = async ({
         });
       });
 
-      const sorted = [...productMap.entries()]
-        .sort((a, b) => b[1].quantity - a[1].quantity)
+      const sorted = [...productMap.values()]
+        .sort((a, b) => b.quantity - a.quantity)
         .slice(0, 5)
-        .map(([_, v], i) => `${i + 1}. ${v.title} - ${v.quantity} units`)
+        .map((v, i) => `${i + 1}. ${v.title} - ${v.quantity} units`)
         .join("\n");
 
       return `Top 5 selling products (last ${days} days):\n${sorted}`;
