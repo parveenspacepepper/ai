@@ -38,8 +38,14 @@ export const shopifyLangTool = new DynamicStructuredTool({
     name: "shopifyTool",
     description: "Query Shopify store: customer count, orders, sales, and products",
     schema: z.object({
-      action: z.string(),
-      dateRange: z.string().optional(),
+        action: z.enum([
+            "customerCount",
+            "orderCount",
+            "salesLastNDays",
+            "avgOrderValue",
+            "topSellingProducts"
+          ]),
+        days: z.number().optional(),
       filter: z.string().optional(),
     }),
     func: shopifyTool,
