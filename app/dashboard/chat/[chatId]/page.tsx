@@ -5,7 +5,7 @@ import ChatInterface from "@/components/ChatInterface";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { getConvexClient } from "@/lib/convex";
-
+import { Doc } from "@/convex/_generated/dataModel";
 interface ChatPageProps {
   params: Promise<{
     chatId: Id<"chats">;
@@ -15,7 +15,7 @@ interface ChatPageProps {
 export default function ChatPage({ params }: ChatPageProps) {
   const { chatId } = use(params); // ✅ unwrap promise with React.use()
 
-  const [initialMessages, setInitialMessages] = useState<any[] | null>(null);
+  const [initialMessages, setInitialMessages] = useState<Doc<"messages">[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {

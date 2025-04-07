@@ -1,4 +1,4 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import wxflows from "@wxflows/sdk/langchain"
 import {
@@ -13,7 +13,7 @@ import {
     ChatPromptTemplate,
     MessagesPlaceholder,
 } from "@langchain/core/prompts";
-import { AIMessage, BaseMessage, HumanMessage, SystemMessage, trimMessages } from "@langchain/core/messages";
+import { AIMessage, BaseMessage,  SystemMessage, trimMessages } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import { shopifyTool } from "./tools/shopifyTool";
 import { DynamicStructuredTool } from "langchain/tools";
@@ -171,44 +171,44 @@ const createWorkflow = () => {
     return stateGraph;
 };
 
-function addCachingHeaders(messages: BaseMessage[]): BaseMessage[] {
-    // Rules of caching headers for turn-by-turn conversations 
-    // 1. Cache the first SYSTEM message 
-    // 2. Cache the LAST message 
-    // 3. Cache the second to last HUMAN message 
-    if (!messages.length) return messages;
-    // Create a copy of messages to avoid mutating the original 
-    const cachedMessages = [...messages];
-    // Helper to add cache control 
-    const addCache = (message: BaseMessage) => {
-        message.content = [
-            {
-                type: "text",
-                text: message.content as string,
-                cache_control: { type: "ephemeral" },
-            },
-        ];
-    }
-    // Cache the last message 
-    // console.log(" Caching last message"); 
-    addCache(cachedMessages.at(-1)!);
-    // Find and cache the second-to-last human message 
-    let humanCount = 0;
-    for (let i = cachedMessages.length - 1; i >= 0; i--) {
-        if (cachedMessages[i] instanceof HumanMessage) {
-            humanCount++;
-            if (humanCount === 2) {
-                // console.log(" Caching second-to-last human message"); 
-                addCache(cachedMessages[i]);
-                break;
-            }
-        }
-    }
-    return cachedMessages;
-}
+// function addCachingHeaders(messages: BaseMessage[]): BaseMessage[] {
+//     // Rules of caching headers for turn-by-turn conversations 
+//     // 1. Cache the first SYSTEM message 
+//     // 2. Cache the LAST message 
+//     // 3. Cache the second to last HUMAN message 
+//     if (!messages.length) return messages;
+//     // Create a copy of messages to avoid mutating the original 
+//     const cachedMessages = [...messages];
+//     // Helper to add cache control 
+//     const addCache = (message: BaseMessage) => {
+//         message.content = [
+//             {
+//                 type: "text",
+//                 text: message.content as string,
+//                 cache_control: { type: "ephemeral" },
+//             },
+//         ];
+//     }
+//     // Cache the last message 
+//     // console.log(" Caching last message"); 
+//     addCache(cachedMessages.at(-1)!);
+//     // Find and cache the second-to-last human message 
+//     let humanCount = 0;
+//     for (let i = cachedMessages.length - 1; i >= 0; i--) {
+//         if (cachedMessages[i] instanceof HumanMessage) {
+//             humanCount++;
+//             if (humanCount === 2) {
+//                 // console.log(" Caching second-to-last human message"); 
+//                 addCache(cachedMessages[i]);
+//                 break;
+//             }
+//         }
+//     }
+//     return cachedMessages;
+// }
 export async function submitQuestion(messages: BaseMessage[], chatId: string) {
 
-    const cachedMessages = addCachingHeaders(messages);
+    // const cachedMessages = addCachingHeaders(messages);
     const workflow = createWorkflow();
     // Create a checkpoint to save the state of the conversation 
     const checkpointer = new MemorySaver();
