@@ -3,9 +3,7 @@ import { DynamicStructuredTool } from "langchain/tools";
 import { z } from "zod";
 import whisperTranscribe from "@/lib/whisper";
 import pineconeUpsert from "@/lib/pinecone";
-import { tmpdir } from "os";
 import fs from "fs/promises";
-import path from "path";
 
 export const mediaTranscriptionTool = new DynamicStructuredTool({
   name: "mediaTranscriptionTool",
