@@ -18,6 +18,10 @@ import { ChatOpenAI } from "@langchain/openai";
 import { shopifyTool } from "./tools/shopifyTool";
 import { DynamicStructuredTool } from "langchain/tools";
 import { z } from "zod";
+import { semrushLangTool } from "./tools/semrushTool";
+import { mediaTranscriptionTool } from "./tools/mediaTranscriptionTool";
+import { mediaRetrievalTool } from "./tools/mediaRetrievalTool";
+
 // Trim the messages to manage conversation history 
 const trimmer = trimMessages({
     maxTokens: 10,
@@ -54,7 +58,7 @@ export const shopifyLangTool = new DynamicStructuredTool({
 const wxflowTools = await toolClient.lcTools;
 
 // combine wxflows tools and custom tools
-const tools = [...wxflowTools, shopifyLangTool];
+const tools = [...wxflowTools, shopifyLangTool,  semrushLangTool, mediaTranscriptionTool,  mediaRetrievalTool];
 
 const toolNode = new ToolNode(tools);
 // 3. Create OpenAI Model
