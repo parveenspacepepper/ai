@@ -1,4 +1,3 @@
-
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import wxflows from "@wxflows/sdk/langchain"
 import {
@@ -47,10 +46,12 @@ export const shopifyLangTool = new DynamicStructuredTool({
             "orderCount",
             "salesLastNDays",
             "avgOrderValue",
-            "topSellingProducts"
+            "topSellingProducts",
+            "topBuyingCustomers",
+            "allProducts"
           ]),
         days: z.number().optional(),
-      filter: z.string().optional(),
+        filter: z.string().optional(),
     }),
     func: shopifyTool,
   });
