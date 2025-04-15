@@ -9,6 +9,7 @@ type ShopifyOrder = {
     id: string;
     first_name: string;
     last_name: string;
+    email?: string;
   };
 };
 
@@ -120,15 +121,16 @@ export const shopifyTool = async ({
     }
 
     case "topBuyingCustomers": {
-      const url = `${baseUrl}/admin/api/2023-07/orders.json?status=any&limit=250`;
+      const url = `${baseUrl}/admin/api/2023-07/orders.json?status=any&limit=250&fields=id,total_price,customer`;
       const data = await fetchFromShopify(url, headers) as ShopifyOrdersResponse;
 
-      const customerMap = new Map<string, { totalSpent: number; name: string }>();
+      const customerMap = new Map<string, { totalSpent: number; name: string; email: string }>();
 
       data.orders.forEach((order) => {
         if (order.customer) {
           const customerId = order.customer.id;
-          const customerName = `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Unknown';
+          const customerName = `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim();
+          const customerEmail = order.customer.email || '';
           const orderTotal = parseFloat(order.total_price || "0");
           
           const existing = customerMap.get(customerId);
@@ -137,7 +139,8 @@ export const shopifyTool = async ({
           } else {
             customerMap.set(customerId, {
               totalSpent: orderTotal,
-              name: customerName,
+              name: customerName || customerEmail || 'Unknown',
+              email: customerEmail
             });
           }
         }
@@ -146,7 +149,7 @@ export const shopifyTool = async ({
       const sortedCustomers = [...customerMap.values()]
         .sort((a, b) => b.totalSpent - a.totalSpent)
         .slice(0, 5)
-        .map((v, i) => `${i + 1}. ${v.name} - ₹${v.totalSpent.toFixed(2)}`)
+        .map((v, i) => `${i + 1}. ${v.name} - ₹${v.totalSpent.toFixed(2)}${v.email ? ` (${v.email})` : ''}`)
         .join("\n");
 
       return `Top 5 buying customers:\n${sortedCustomers}`;
