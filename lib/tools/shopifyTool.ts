@@ -5,6 +5,11 @@ type ShopifyOrder = {
     title: string;
     quantity: number;
   }>;
+  customer?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
 };
 
 interface ShopifyOrdersResponse {
@@ -15,12 +20,23 @@ interface ShopifyCountResponse {
   count: number;
 }
 
-type ShopifyAction =
-  | "customerCount"
-  | "orderCount"
-  | "salesLastNDays"
-  | "avgOrderValue"
-  | "topSellingProducts";
+enum ShopifyAction {
+  CustomerCount = "customerCount",
+  OrderCount = "orderCount",
+  SalesLastNDays = "salesLastNDays",
+  AvgOrderValue = "avgOrderValue",
+  TopSellingProducts = "topSellingProducts",
+  TopBuyingCustomers = "topBuyingCustomers",
+  AllProducts = "allProducts",
+}
+
+const fetchFromShopify = async (url: string, headers: HeadersInit): Promise<any> => {
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+};
 
 export const shopifyTool = async ({
   action,
@@ -43,35 +59,29 @@ export const shopifyTool = async ({
 
   const orderFetchUrl = `${baseUrl}/admin/api/2023-07/orders.json?created_at_min=${from}&created_at_max=${to}&status=any&limit=250`;
 
-
-  
   switch (action) {
-    case "customerCount": {
+    case ShopifyAction.CustomerCount: {
       const url = `${baseUrl}/admin/api/2023-07/customers/count.json`;
-      const response = await fetch(url, { headers });
-      const data = (await response.json()) as ShopifyCountResponse;
+      const data = await fetchFromShopify(url, headers) as ShopifyCountResponse;
       return `Customer count: ${data.count}`;
     }
 
-    case "orderCount": {
+    case ShopifyAction.OrderCount: {
       const url = `${baseUrl}/admin/api/2023-07/orders/count.json?created_at_min=${from}&created_at_max=${to}&status=any`;
-      const response = await fetch(url, { headers });
-      const data = (await response.json()) as ShopifyCountResponse;
+      const data = await fetchFromShopify(url, headers) as ShopifyCountResponse;
       return `Order count in last ${days} days: ${data.count}`;
     }
 
-    case "salesLastNDays": {
-      const response = await fetch(orderFetchUrl, { headers });
-      const data = (await response.json()) as ShopifyOrdersResponse;
+    case ShopifyAction.SalesLastNDays: {
+      const data = await fetchFromShopify(orderFetchUrl, headers) as ShopifyOrdersResponse;
       const totalSales = data.orders.reduce((sum, order) => {
         return sum + parseFloat(order.total_price || "0");
       }, 0);
       return `Sales in the last ${days} days: ₹${totalSales.toFixed(2)}`;
     }
 
-    case "avgOrderValue": {
-      const response = await fetch(orderFetchUrl, { headers });
-      const data = (await response.json()) as ShopifyOrdersResponse;
+    case ShopifyAction.AvgOrderValue: {
+      const data = await fetchFromShopify(orderFetchUrl, headers) as ShopifyOrdersResponse;
       const totalSales = data.orders.reduce((sum, order) => {
         return sum + parseFloat(order.total_price || "0");
       }, 0);
@@ -79,9 +89,8 @@ export const shopifyTool = async ({
       return `Average order value (last ${days} days): ₹${average.toFixed(2)}`;
     }
 
-    case "topSellingProducts": {
-      const response = await fetch(orderFetchUrl, { headers });
-      const data = (await response.json()) as ShopifyOrdersResponse;
+    case ShopifyAction.TopSellingProducts: {
+      const data = await fetchFromShopify(orderFetchUrl, headers) as ShopifyOrdersResponse;
 
       const productMap = new Map<string, { title: string; quantity: number }>();
 
@@ -106,6 +115,46 @@ export const shopifyTool = async ({
         .join("\n");
 
       return `Top 5 selling products (last ${days} days):\n${sorted}`;
+    }
+
+
+    case ShopifyAction.TopBuyingCustomers: {
+      const url = `${baseUrl}/admin/api/2023-07/orders.json?status=any&limit=250`;
+      const data = await fetchFromShopify(url, headers) as ShopifyOrdersResponse;
+
+      const customerMap = new Map<string, { totalSpent: number; name: string }>();
+
+      data.orders.forEach((order) => {
+        const customerId = order.customer?.id;
+        const customerName = order.customer?.first_name + " " + order.customer?.last_name;
+        if (customerId) {
+          const existing = customerMap.get(customerId);
+          const orderTotal = parseFloat(order.total_price || "0");
+          if (existing) {
+            existing.totalSpent += orderTotal;
+          } else {
+            customerMap.set(customerId, {
+              totalSpent: orderTotal,
+              name: customerName || "Unknown",
+            });
+          }
+        }
+      });
+
+      const sortedCustomers = [...customerMap.values()]
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .slice(0, 5)
+        .map((v, i) => `${i + 1}. ${v.name} - ₹${v.totalSpent.toFixed(2)}`)
+        .join("\n");
+
+      return `Top 5 buying customers:\n${sortedCustomers}`;
+    }
+
+    case ShopifyAction.AllProducts: {
+      const url = `${baseUrl}/admin/api/2023-07/products.json?limit=250`;
+      const data = await fetchFromShopify(url, headers);
+      const products = data.products.map((product: any) => product.title).join("\n");
+      return `All products in the store:\n${products}`;
     }
 
     default:
