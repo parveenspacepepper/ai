@@ -43,6 +43,8 @@ export const shopifyTool = async ({
 
   const orderFetchUrl = `${baseUrl}/admin/api/2023-07/orders.json?created_at_min=${from}&created_at_max=${to}&status=any&limit=250`;
 
+
+  
   switch (action) {
     case "customerCount": {
       const url = `${baseUrl}/admin/api/2023-07/customers/count.json`;
