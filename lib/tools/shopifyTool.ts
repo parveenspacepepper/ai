@@ -20,6 +20,18 @@ interface ShopifyCountResponse {
   count: number;
 }
 
+interface ShopifyProductsResponse {
+  products: Array<{
+    id: string;
+    title: string;
+    description: string;
+    vendor: string;
+    product_type: string;
+    price: string;
+    status: string;
+  }>;
+}
+
 enum ShopifyAction {
   CustomerCount = "customerCount",
   OrderCount = "orderCount",
@@ -117,7 +129,6 @@ export const shopifyTool = async ({
       return `Top 5 selling products (last ${days} days):\n${sorted}`;
     }
 
-
     case ShopifyAction.TopBuyingCustomers: {
       const url = `${baseUrl}/admin/api/2023-07/orders.json?status=any&limit=250`;
       const data = await fetchFromShopify(url, headers) as ShopifyOrdersResponse;
@@ -125,17 +136,18 @@ export const shopifyTool = async ({
       const customerMap = new Map<string, { totalSpent: number; name: string }>();
 
       data.orders.forEach((order) => {
-        const customerId = order.customer?.id;
-        const customerName = order.customer?.first_name + " " + order.customer?.last_name;
-        if (customerId) {
-          const existing = customerMap.get(customerId);
+        if (order.customer) {
+          const customerId = order.customer.id;
+          const customerName = `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Unknown';
           const orderTotal = parseFloat(order.total_price || "0");
+          
+          const existing = customerMap.get(customerId);
           if (existing) {
             existing.totalSpent += orderTotal;
           } else {
             customerMap.set(customerId, {
               totalSpent: orderTotal,
-              name: customerName || "Unknown",
+              name: customerName,
             });
           }
         }
@@ -152,9 +164,17 @@ export const shopifyTool = async ({
 
     case ShopifyAction.AllProducts: {
       const url = `${baseUrl}/admin/api/2023-07/products.json?limit=250`;
-      const data = await fetchFromShopify(url, headers);
-      const products = data.products.map((product: any) => product.title).join("\n");
-      return `All products in the store:\n${products}`;
+      const data = await fetchFromShopify(url, headers) as ShopifyProductsResponse;
+      
+      if (!data.products || data.products.length === 0) {
+        return "No products found in the store.";
+      }
+      
+      const productList = data.products
+        .map((product, index) => `${index + 1}. ${product.title} - ₹${product.price}`)
+        .join("\n");
+      
+      return `All products in the store (${data.products.length}):\n${productList}`;
     }
 
     default:
