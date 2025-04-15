@@ -42,7 +42,7 @@ enum ShopifyAction {
   AllProducts = "allProducts",
 }
 
-const fetchFromShopify = async (url: string, headers: HeadersInit): Promise<any> => {
+const fetchFromShopify = async (url: string, headers: HeadersInit): Promise<unknown> => {
   const response = await fetch(url, { headers });
   if (!response.ok) {
     throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
