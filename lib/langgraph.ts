@@ -20,6 +20,8 @@ import { z } from "zod";
 import { semrushLangTool } from "./tools/semrushTool";
 import { mediaTranscriptionTool } from "./tools/mediaTranscriptionTool";
 import { mediaRetrievalTool } from "./tools/mediaRetrievalTool";
+// import { fileAnalysisTool } from "./tools/fileAnalysisTool";
+import { metaAnalyticsTool } from "./tools/metaAnalyticsTool";
 
 // Trim the messages to manage conversation history 
 const trimmer = trimMessages({
@@ -59,7 +61,7 @@ export const shopifyLangTool = new DynamicStructuredTool({
 const wxflowTools = await toolClient.lcTools;
 
 // combine wxflows tools and custom tools
-const tools = [...wxflowTools, shopifyLangTool,  semrushLangTool, mediaTranscriptionTool,  mediaRetrievalTool];
+const tools = [...wxflowTools, shopifyLangTool,  semrushLangTool, mediaTranscriptionTool,  mediaRetrievalTool, metaAnalyticsTool];
 
 const toolNode = new ToolNode(tools);
 // 3. Create OpenAI Model

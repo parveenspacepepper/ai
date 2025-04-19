@@ -21,6 +21,10 @@ Tool-specific instructions:
 2. google books: 
 -For search: {books(q: $q, maxResults: SmaxResults) { volumeld title authors}} 
 -Variables: [ "q": "search terms", "maxResults"5} 
+3. meta_analytics:
+-Actions available: "ad_performance", "post_performance", "page_insights", "audience_insights"
+-Optional parameters: pageId, postId, adId, dateRange (format: YYYY-MM-DD)
+-Example: { "action": "page_insights", "dateRange": "2024-03-01" }
 refer to previous messages for context and use them to accurately answer the question 
 `;
 export default SYSTEM_MESSAGE;
