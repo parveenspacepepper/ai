@@ -343,4 +343,27 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
     console.error('Error in refreshAccessToken:', error);
     throw error;
   }
+}
+
+export async function getPageId(): Promise<string> {
+  try {
+    const accessToken = await getValidAccessToken();
+    const response = await fetch(
+      `${process.env.META_API_BASE_URL}/me/accounts?access_token=${accessToken}`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch page ID');
+    }
+    
+    const data = await response.json();
+    if (data.data && data.data.length > 0) {
+      return data.data[0].id;
+    }
+    
+    throw new Error('No pages found');
+  } catch (error) {
+    console.error('Error getting page ID:', error);
+    throw error;
+  }
 } 

@@ -7,12 +7,49 @@ interface MetaAdPerformance {
   id: string;
   name: string;
   campaign?: {
+    id: string;
     name: string;
+    objective: string;
+    status: string;
   };
   adset?: {
+    id: string;
     name: string;
+    targeting: {
+      age_min: number;
+      age_max: number;
+      genders: number[];
+      geo_locations: {
+        countries: string[];
+      };
+      interests: string[];
+    };
+    status: string;
+  };
+  creative?: {
+    id: string;
+    title: string;
+    body: string;
+    image_url: string;
+    video_id?: string;
+    duration_sec?: number;
+    frame_rate?: number;
+    resolution?: string;
+    aspect_ratio?: string;
+    sound_type?: string;
+    language?: string;
+    creative_format?: string;
+    production_elements?: string[];
+    core_elements_highlighted?: string[];
+    ad_objective?: string;
+    cta_type?: string;
+    funnel_stage?: string;
+    target_persona?: string;
+    audience_traits?: string[];
+    distribution_channel?: string;
   };
   insights?: Array<{
+    // Basic Metrics
     impressions: number;
     clicks: number;
     spend: number;
@@ -20,25 +57,61 @@ interface MetaAdPerformance {
     cpc: number;
     conversions: number;
     conversion_rate: number;
+    reach: number;
+    frequency: number;
+    unique_clicks: number;
+    
+    // Video Performance Metrics
+    video_views: number;
+    video_30_sec_watched_views: number;
+    video_p25_watched_actions: number;
+    video_p50_watched_actions: number;
+    video_p75_watched_actions: number;
+    video_p95_watched_actions: number;
+    video_p100_watched_actions: number;
+    video_avg_time_watched_actions: number;
+    view_duration_avg: number;
+    audience_retention_curve: number[];
+    
+    // Engagement Metrics
+    social_impressions: number;
+    social_clicks: number;
+    social_spend: number;
+    inline_link_clicks: number;
+    inline_post_engagement: number;
+    engagement_rate: number;
+    save_rate: number;
+    bounce_rate: number;
+    return_viewers: number;
+    
+    // Audience Insights
+    best_performing_region: string;
+    audience_retention: {
+      age_groups: Record<string, number>;
+      gender: Record<string, number>;
+      interests: Record<string, number>;
+    };
+    
+    // Performance Analysis
+    outcome_vs_expected: number;
+    prediction_confidence_at_launch: number;
+    causal_inference_score: number;
+    model_version_used: string;
+    experiment_batch_id?: string;
+    tag_correlation_delta: number;
+    
+    // Time Period
     region: string;
     start_time: string;
     end_time: string;
   }>;
+  effective_status: string;
+  status: string;
+  created_time: string;
+  updated_time: string;
 }
 
-interface MetaPostPerformance {
-  post_id: string;
-  post_type: string;
-  message?: string;
-  created_time: string;
-  insights?: Array<{
-    post_impressions: number;
-    post_engaged_users: number;
-    post_reactions_by_type: Record<string, number>;
-    post_shares: number;
-    region: string;
-  }>;
-}
+
 
 // interface MetaPageInsights {
 //   page_id: string;
@@ -80,181 +153,158 @@ export async function fetchFromMeta(
   return response.json();
 }
 
+// Add function to fetch active ads
+async function fetchActiveAds(accessToken: string): Promise<MetaAdPerformance[]> {
+  const endpoint = `${process.env.META_API_BASE_URL}/${process.env.META_AD_ACCOUNT_ID}/ads`;
+  const params = {
+    access_token: accessToken,
+    fields: `
+      id,name,status,effective_status,
+      campaign{id,name,objective,status},
+      adset{id,name,targeting,status},
+      creative{id,title,body,image_url,video_id,
+        duration_sec,frame_rate,resolution,aspect_ratio,
+        sound_type,language,creative_format,production_elements,
+        core_elements_highlighted,ad_objective,cta_type,
+        funnel_stage,target_persona,audience_traits,
+        distribution_channel},
+      insights{impressions,clicks,spend,ctr,cpc,
+        conversions,conversion_rate,reach,frequency,
+        unique_clicks,video_views,video_30_sec_watched_views,
+        video_p25_watched_actions,video_p50_watched_actions,
+        video_p75_watched_actions,video_p95_watched_actions,
+        video_p100_watched_actions,video_avg_time_watched_actions,
+        social_impressions,social_clicks,social_spend,
+        inline_link_clicks,inline_post_engagement,
+        engagement_rate,save_rate,bounce_rate,
+        return_viewers,best_performing_region,
+        audience_retention{age_groups,gender,interests},
+        outcome_vs_expected,prediction_confidence_at_launch,
+        causal_inference_score,model_version_used,
+        experiment_batch_id,tag_correlation_delta,
+        region,start_time,end_time
+      }
+    `.replace(/\s+/g, ''),
+    filtering: JSON.stringify([{
+      field: 'effective_status',
+      operator: 'IN',
+      value: ['ACTIVE']
+    }])
+  };
+
+  const response = await fetchFromMeta(endpoint, accessToken, params) as { data: MetaAdPerformance[] };
+  return response.data;
+}
+
 // Main function to handle different Meta analytics actions
 export const metaAnalyticsTool = new DynamicStructuredTool({
   name: "meta_analytics",
-  description: "Fetch analytics data from Meta (Facebook) API. Use this tool to get ad performance, post performance, page insights, and audience insights.",
+  description: "Fetch analytics data from Meta (Facebook) API. Use this tool to get ad performance, campaign performance, ad set performance, and audience insights.",
   schema: z.object({
-    action: z.enum(["ad_performance", "post_performance", "page_insights", "audience_insights"]),
+    action: z.enum([
+      "ad_performance",
+      "campaign_performance",
+      "adset_performance",
+      "post_performance",
+      "page_insights",
+      "audience_insights",
+      "active_ads"
+    ]),
     pageId: z.string().optional(),
     postId: z.string().optional(),
     adId: z.string().optional(),
+    campaignId: z.string().optional(),
+    adsetId: z.string().optional(),
     dateRange: z.string().optional(),
+    status: z.enum(["ACTIVE", "PAUSED", "DELETED", "ALL"]).optional(),
+    fields: z.string().optional(),
+    limit: z.number().optional(),
   }),
-  func: async ({ action, dateRange }) => {
+  func: async ({ action, dateRange,  fields, limit, pageId, postId, adId, campaignId, adsetId }) => {
     try {
-      // Get a valid access token
       const accessToken = await getValidAccessToken();
       
-      switch (action) {
-        case "ad_performance": {
-          const adPerformanceResponse = await fetchFromMeta(
-            "me/ads",
-            accessToken,
-            {
-              fields: "id,name,campaign{name},adset{name},insights{impressions,clicks,spend,ctr,cpc,conversions,conversion_rate,region,start_time,end_time}",
-              limit: "10",
-              time_range: JSON.stringify({ since: dateRange }),
-            }
-          ) as { data: MetaAdPerformance[] };
-
-          if (!adPerformanceResponse.data || adPerformanceResponse.data.length === 0) {
-            return "No ad performance data found for the specified criteria.";
-          }
-
-          const formattedData = adPerformanceResponse.data.map(ad => {
-            const insights = ad.insights?.[0] || {
-              impressions: 0,
-              clicks: 0,
-              spend: 0,
-              ctr: 0,
-              cpc: 0,
-              conversions: 0,
-              conversion_rate: 0,
-              start_time: 'N/A',
-              end_time: 'N/A'
-            };
-            return `Ad: ${ad.name}
-Campaign: ${ad.campaign?.name || 'N/A'}
-Ad Set: ${ad.adset?.name || 'N/A'}
-Impressions: ${insights.impressions}
-Clicks: ${insights.clicks}
-CTR: ${insights.ctr.toFixed(2)}%
-CPC: $${insights.cpc.toFixed(2)}
-Conversions: ${insights.conversions}
-Conversion Rate: ${insights.conversion_rate.toFixed(2)}%
-Spend: $${insights.spend.toFixed(2)}
-Period: ${insights.start_time} to ${insights.end_time}`;
-          }).join("\n\n");
-
-          return `Ad Performance (${dateRange}):\n\n${formattedData}`;
-        }
-
-        case "post_performance": {
-          const postPerformanceResponse = await fetchFromMeta(
-            "me/posts",
-            accessToken,
-            {
-              fields: "id,message,created_time,insights{post_impressions,post_engaged_users,post_reactions_by_type,post_shares,region}",
-              limit: "10",
-              time_range: JSON.stringify({ since: dateRange }),
-            }
-          ) as { data: MetaPostPerformance[] };
-
-          if (!postPerformanceResponse.data || postPerformanceResponse.data.length === 0) {
-            return "No post performance data found for the specified criteria.";
-          }
-
-          const formattedData = postPerformanceResponse.data.map(post => {
-            const insights = post.insights?.[0] || {
-              post_impressions: 0,
-              post_engaged_users: 0,
-              post_reactions_by_type: {},
-              post_shares: 0
-            };
-            const reactions = insights.post_reactions_by_type || {};
-            const totalReactions = Object.values(reactions as Record<string, number>).reduce((sum: number, count: number) => sum + count, 0);
-
-            return `Post ID: ${post.post_id}
-Created: ${post.created_time}
-Message: ${post.message?.substring(0, 100)}${post.message && post.message.length > 100 ? '...' : ''}
-Impressions: ${insights.post_impressions}
-Engaged Users: ${insights.post_engaged_users}
-Reactions: ${totalReactions}
-Shares: ${insights.post_shares}`;
-          }).join("\n\n");
-
-          return `Post Performance (${dateRange}):\n\n${formattedData}`;
-        }
-
-        case "page_insights": {
-          const pagePerformanceResponse = await fetchFromMeta(
-            "me",
-            accessToken,
-            {
-              fields: "id,name,insights{period,values{name,value}}",
-              metric: "page_impressions,page_engaged_users,page_actions,page_views",
-              period: dateRange || "1d",
-            }
-          ) as { id: string; name: string; insights: { data: { period: string; values: { name: string; value: number }[] }[] } };
-
-          if (!pagePerformanceResponse.insights?.data || pagePerformanceResponse.insights.data.length === 0) {
-            return "No page insights data found for the specified criteria.";
-          }
-
-          const insights = pagePerformanceResponse.insights.data[0];
-          const metrics = insights.values.reduce((acc, metric) => {
-            acc[metric.name] = metric.value;
-            return acc;
-          }, {} as Record<string, number>);
-
-          return `Page Insights for ${pagePerformanceResponse.name} (${insights.period}):
-Page Impressions: ${metrics.page_impressions || 0}
-Page Engaged Users: ${metrics.page_engaged_users || 0}
-Page Actions: ${metrics.page_actions || 0}
-Page Views: ${metrics.page_views || 0}`;
-        }
-
-        case "audience_insights": {
-          const audienceResponse = await fetchFromMeta(
-            "me/insights",
-            accessToken,
-            {
-              metric: "audience_city,audience_country,audience_gender_age,audience_interest",
-              period: dateRange || "1d",
-            }
-          ) as { data: { name: string; period: string; values: { value: Record<string, number> }[] }[] };
-
-          if (!audienceResponse.data || audienceResponse.data.length === 0) {
-            return "No audience insights data found for the specified criteria.";
-          }
-
-          const formattedData = audienceResponse.data.map(insight => {
-            const values = insight.values[0]?.value || {};
-
-            if (insight.name === "audience_gender_age") {
-              const genderAgeData = Object.entries(values)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10)
-                .map(([key, value]) => `${key}: ${value}%`)
-                .join("\n");
-
-              return `Gender and Age Distribution (${insight.period}):\n${genderAgeData}`;
-            } else if (insight.name === "audience_interest") {
-              const interestData = Object.entries(values)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10)
-                .map(([key, value]) => `${key}: ${value}%`)
-                .join("\n");
-
-              return `Top Interests (${insight.period}):\n${interestData}`;
-            } else {
-              const locationData = Object.entries(values)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10)
-                .map(([key, value]) => `${key}: ${value}%`)
-                .join("\n");
-
-              return `Top Locations (${insight.period}):\n${locationData}`;
-            }
-          }).join("\n\n");
-
-          return `Audience Insights (${dateRange}):\n\n${formattedData}`;
-        }
-
-        default:
-          return `Unsupported action "${action}".`;
+      if (action === "active_ads") {
+        const activeAds = await fetchActiveAds(accessToken);
+        return JSON.stringify(activeAds, null, 2);
       }
+
+      // Default fields if none specified
+      const defaultFields = {
+        ad_performance: `
+          id,name,
+          campaign{id,name,objective,status},
+          adset{id,name,targeting,status},
+          creative{
+            id,title,body,image_url,video_id,
+            duration_sec,frame_rate,resolution,aspect_ratio,
+            sound_type,language,creative_format,production_elements,
+            core_elements_highlighted,ad_objective,cta_type,
+            funnel_stage,target_persona,audience_traits,distribution_channel
+          },
+          insights{
+            impressions,clicks,spend,ctr,cpc,conversions,conversion_rate,
+            reach,frequency,unique_clicks,
+            video_views,video_30_sec_watched_views,
+            video_p25_watched_actions,video_p50_watched_actions,
+            video_p75_watched_actions,video_p95_watched_actions,
+            video_p100_watched_actions,video_avg_time_watched_actions,
+            view_duration_avg,audience_retention_curve,
+            social_impressions,social_clicks,social_spend,
+            inline_link_clicks,inline_post_engagement,
+            engagement_rate,save_rate,bounce_rate,
+            return_viewers,best_performing_region,
+            audience_retention{age_groups,gender,interests},
+            outcome_vs_expected,prediction_confidence_at_launch,
+            causal_inference_score,model_version_used,
+            experiment_batch_id,tag_correlation_delta,
+            region,start_time,end_time
+          },
+          effective_status,status,created_time,updated_time
+        `,
+        campaign_performance: "id,name,objective,status,start_time,stop_time,daily_budget,lifetime_budget,insights{impressions,clicks,spend,ctr,cpc,conversions,conversion_rate,reach,frequency,unique_clicks,social_impressions,social_clicks,social_spend,inline_link_clicks,inline_post_engagement,video_views,video_30_sec_watched_views,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,region,start_time,end_time}",
+        adset_performance: "id,name,campaign_id,status,targeting,daily_budget,lifetime_budget,start_time,end_time,insights{impressions,clicks,spend,ctr,cpc,conversions,conversion_rate,reach,frequency,unique_clicks,social_impressions,social_clicks,social_spend,inline_link_clicks,inline_post_engagement,video_views,video_30_sec_watched_views,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions,region,start_time,end_time}"
+      };
+
+      const selectedFields: string = fields || defaultFields[action as keyof typeof defaultFields] || "";
+      const timeRange = dateRange ? JSON.stringify({ since: dateRange }) : undefined;
+      // const statusFilter = status && status !== "ALL" ? `&effective_status=${status}` : "";
+
+      let endpoint = "";
+      switch (action) {
+        case "ad_performance":
+          endpoint = adId ? `/${adId}` : "/me/ads";
+          break;
+        case "campaign_performance":
+          endpoint = campaignId ? `/${campaignId}` : "/me/campaigns";
+          break;
+        case "adset_performance":
+          endpoint = adsetId ? `/${adsetId}` : "/me/adsets";
+          break;
+        case "post_performance":
+          endpoint = postId ? `/${postId}` : "/me/posts";
+          break;
+        case "page_insights":
+          endpoint = pageId ? `/${pageId}/insights` : "/me/insights";
+          break;
+        case "audience_insights":
+          endpoint = "/me/insights";
+          break;
+      }
+
+      const params: Record<string, string> = {
+        fields: selectedFields,
+        limit: limit?.toString() || "50",
+        ...(timeRange && { time_range: timeRange })
+      };
+
+      const response = await fetchFromMeta(
+        endpoint,
+        accessToken,
+        params
+      );
+
+      return JSON.stringify(response, null, 2);
     } catch (error) {
       console.error("Error in meta analytics tool:", error);
       throw error;
